@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Yönet Case Lab · DBS</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&family=Source+Serif+4:wght@600;700&display=swap">
 <style>
@@ -43,6 +48,11 @@ nav.top .grp span{font-size:.72rem;letter-spacing:.1em;color:#B9C3F0;margin-righ
 .gbtn[aria-pressed="true"]{background:var(--teal);color:#072146;border-color:var(--teal)}
 .facbtn{border:1px solid var(--facline);background:transparent;color:#F3C98A;border-radius:6px;padding:5px 10px;font-size:.8rem;font-weight:700}
 .facbtn.on{background:var(--facline);color:#1b1b1b}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;letter-spacing:.08em;color:#B9C3F0;margin-right:6px}
+.live i{width:9px;height:9px;border-radius:50%;background:#8C97B5;display:inline-block}
+.live.on i{background:#2DCCCD;box-shadow:0 0 0 3px rgba(45,204,205,.25)}
+.live.err i{background:#F08A98}
+.note textarea.remote,table.tbl .remote{box-shadow:inset 0 0 0 2px var(--teal)}
 
 /* hero */
 .hero{margin-top:14px}
@@ -160,10 +170,11 @@ pre{white-space:pre-wrap;background:var(--surface2);border-radius:8px;padding:10
 @media (prefers-reduced-motion: reduce){.toast{transition:none}}
 @media (max-width:640px){.blok{padding:16px}.time{text-align:left}nav.top .grp{margin-left:0}}
 </style>
-
+</head>
+<body>
 <nav class="top" aria-label="Pano">
   <a href="#akis">Akış</a><a href="#b0">Açılış</a><a href="#b1">Tur 1</a><a href="#b2">Tur 2</a><a href="#b3">Tur 3</a><a href="#b4">Tur 4</a><a href="#b5">Galeri</a><a href="#rehber">Vaka Rehberi</a><a href="#yz">YZ Kiti</a>
-  <div class="grp"><span>GRUP</span>
+  <div class="grp"><span class="live" id="live" title="Canlı paylaşım durumu"><i></i><span id="liveTxt">bağlanıyor</span></span><span>GRUP</span>
     <button class="gbtn" data-g="A" aria-pressed="false">A</button><button class="gbtn" data-g="B" aria-pressed="false">B</button><button class="gbtn" data-g="C" aria-pressed="false">C</button>
     <button class="facbtn" id="facToggle" type="button">Kolaylaştırıcı</button>
   </div>
@@ -932,6 +943,7 @@ KURAL: YZ bilgi taşır, karar vermez — son karar masada. Gerçek müşteri ve
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input type="password" id="facPass" inputmode="numeric" placeholder="••••" aria-label="Kolaylaştırıcı şifresi"><button class="btn primary" id="facOpen" type="button">Aç</button><button class="btn" id="facClose" type="button" hidden>Kapat</button></div>
       <div class="err" id="facErr"></div>
     </div>
+    <div class="fac"><span class="tag">Kolaylaştırıcı · oturum yönetimi</span><p class="small" style="margin:8px 0">Pano canlı paylaşılır: bir grup üyesinin yazdığı not, aynı grubu seçen herkeste anında görünür (Firebase). Yeni oturuma geçerken tüm grupların notlarını ve oyları silmek için:</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="facClear" type="button">Panoyu temizle (tüm gruplar)</button><button class="btn" id="facClearG" type="button">Yalnızca seçili grubu temizle</button></div></div>
     <div class="fac"><span class="tag">Kolaylaştırıcı · soru gelirse</span><ul style="margin-top:8px">
       <li><b>İş kaybı / 4.000 rol (Şubat 2025):</b> geçici ve sözleşmeli roller, üç yıl; kadrolu etkilenmiyor. Masaya: angarya azalınca açılan zamanı kim neye yönlendirir?</li>
       <li><b>MAS yaptırımı (Kasım 2023):</b> altı ay yeni iş/BT değişikliği yasağı, ek sermaye. Masaya: hız ve dayanıklılık birlikte nasıl yönetilir; "Koru" adımı yeter mi?</li>
@@ -1007,17 +1019,71 @@ KURAL: YZ bilgi taşır, karar vermez — son karar masada. Gerçek müşteri ve
   }
   document.addEventListener('click',e=>{
     const b=e.target.closest('.gbtn,[data-sw] button'); if(b){cur=b.dataset.g;ls.set('cl-group',cur);paint();return}
-    const add=e.target.closest('[data-add]'); if(add){const p=$(`[data-pano="${add.dataset.add}"] .notes`);const n=p.querySelectorAll('.note').length+1;const key=`${add.dataset.add}_x${Date.now()}`;p.insertAdjacentHTML('beforeend',`<div class="note c2"><label>Not ${n}</label><textarea data-key="${key}"></textarea><button class="del" type="button">kaldır</button></div>`);return}
-    const del=e.target.closest('.note .del'); if(del){del.closest('.note').remove();return}
+    const add=e.target.closest('[data-add]'); if(add){const p=$(`[data-pano="${add.dataset.add}"] .notes`);const n=p.querySelectorAll('.note').length+1;const key=`${add.dataset.add}_x${Date.now()}`;p.insertAdjacentHTML('beforeend',extraNote(key,n));sync.set(key,'');p.querySelector(`[data-key="${key}"]`).focus();return}
+    const del=e.target.closest('.note .del'); if(del){const ta=del.closest('.note').querySelector('textarea');if(ta&&ta.value.trim()&&!confirm('Bu not grubun tüm üyelerinde silinecek. Emin misiniz?'))return;del.closest('.note').remove();if(ta)sync.remove(ta.dataset.key);return}
     const cp=e.target.closest('[data-copy]'); if(cp){const p=$(`[data-pano="${cp.dataset.copy}"]`);const lines=[];p.querySelectorAll('.note').forEach(n=>{const v=n.querySelector('textarea').value.trim();if(v)lines.push(n.querySelector('label').textContent+': '+v)});copyText(lines.join('\n'));return}
     const ct=e.target.closest('[data-copytbl]'); if(ct){const t=ct.closest('.gpanel').querySelector('table');const lines=[];t.querySelectorAll('tr').forEach(tr=>{const cells=Array.from(tr.children).map(c=>{const f=c.querySelector('input,textarea');return f?f.value.trim():c.textContent.trim()});if(cells.some((c,i)=>i>0&&c))lines.push(cells.join(' | '))});copyText(lines.join('\n'));return}
   });
   function copyText(t){if(!t){toast('Kopyalanacak not yok');return}const done=()=>toast('Panoya kopyalandı — Mural\'a yapıştırın');if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done).catch(()=>fallback(t))}else fallback(t);
     function fallback(t){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){toast('Kopyalanamadı; metni seçip kopyalayın')}ta.remove()}}
 
-  /* ---------- NOT KALICILIĞI (bu tarayıcı) ---------- */
-  document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.key;if(k)ls.set('cl-'+k,e.target.value)});
-  function restore(){$$('[data-key]').forEach(el=>{const v=ls.get('cl-'+el.dataset.key);if(v!=null)el.value=v})}
+  /* ---------- CANLI PAYLAŞIM (Firebase Realtime Database, REST + SSE) ----------
+     Veri yolu: <DB>/yonet/notes/<anahtar> = metin. Her grup üyesi aynı anahtarı okur/yazar; grup seçimi
+     anahtarın içinde (t1A_0 vb.) olduğu için gruplar birbirine karışmaz. localStorage yalnızca çevrimdışı yedek. */
+  const DB='https://kesfet-caselab-default-rtdb.europe-west1.firebasedatabase.app/yonet';
+  const extraNote=(key,n)=>`<div class="note c2"><label>Not ${n}</label><textarea data-key="${key}" aria-label="Not ${n}"></textarea><button class="del" type="button">kaldır</button></div>`;
+  let remote={};            // sunucudaki son görüntü (notes)
+  let votes={};             // oylar: cihazKimliği → 'A'|'B'|'C'
+  const timers={};
+  const live=(st,txt)=>{const l=$('#live');l.classList.remove('on','err');if(st)l.classList.add(st);$('#liveTxt').textContent=txt};
+  const sync={
+    set(k,v){ls.set('cl-'+k,v);clearTimeout(timers[k]);timers[k]=setTimeout(()=>{remote[k]=v;fetch(`${DB}/notes/${k}.json`,{method:'PUT',body:JSON.stringify(v)}).catch(()=>live('err','bağlantı yok'))},350)},
+    remove(k){delete remote[k];try{localStorage.removeItem('cl-'+k)}catch(e){}fetch(`${DB}/notes/${k}.json`,{method:'DELETE'}).catch(()=>live('err','bağlantı yok'))},
+    clear(prefixG){ // prefixG: 'A'|'B'|'C' → yalnızca o grubun anahtarları; yoksa hepsi
+      if(!prefixG){remote={};return fetch(`${DB}.json`,{method:'DELETE'})}
+      const patch={};Object.keys(remote).forEach(k=>{if(/^t\d(r)?[ABC]_/.test(k)&&k.replace(/^t\d(r)?/,'')[0]===prefixG){patch[k]=null;delete remote[k]}});
+      return Object.keys(patch).length?fetch(`${DB}/notes.json`,{method:'PATCH',body:JSON.stringify(patch)}):Promise.resolve()}
+  };
+  function ensureExtra(k){ // eklenen notlar ("_x" anahtarlı) başka cihazdan gelirse kutuyu oluştur
+    if($(`[data-key="${k}"]`))return;const i=k.indexOf('_x');if(i<0)return;const p=$(`[data-pano="${k.slice(0,i)}"] .notes`);if(!p)return;
+    p.insertAdjacentHTML('beforeend',extraNote(k,p.querySelectorAll('.note').length+1));
+  }
+  function apply(k,v){
+    if(v==null){const el=$(`[data-key="${k}"]`);if(el&&el.closest('.note')&&el.closest('.note').querySelector('.del'))el.closest('.note').remove();else if(el&&el!==document.activeElement)el.value='';return}
+    ensureExtra(k);const el=$(`[data-key="${k}"]`);if(!el)return;
+    if(el===document.activeElement)return;          // yazan kişinin kutusunu ezme
+    if(el.value!==v){el.value=v;el.classList.add('remote');setTimeout(()=>el.classList.remove('remote'),900)}
+  }
+  function restore(){ // paint() sonrası: önce yerel yedek, sonra sunucu görüntüsü (sunucu kazanır)
+    $$('[data-key]').forEach(el=>{const v=ls.get('cl-'+el.dataset.key);if(v!=null)el.value=v});
+    Object.keys(remote).forEach(k=>{ensureExtra(k);const el=$(`[data-key="${k}"]`);if(el)el.value=remote[k]});
+    paintVotes();
+  }
+  document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.key;if(k)sync.set(k,e.target.value)});
+  document.addEventListener('focusout',e=>{const k=e.target.dataset&&e.target.dataset.key;if(k&&k in remote&&remote[k]!==e.target.value&&!timers[k])e.target.value=remote[k]});
+
+  /* SSE akışı: tüm /yonet dalını dinle (notes + votes) */
+  let es,retry=1000;
+  function listen(){
+    try{es=new EventSource(`${DB}.json`)}catch(e){live('err','tarayıcı desteklemiyor');return}
+    es.onopen=()=>{retry=1000;live('on','canlı')};
+    es.onerror=()=>{live('err','yeniden bağlanıyor');es.close();setTimeout(listen,retry);retry=Math.min(retry*2,15000)};
+    const onData=e=>{let m;try{m=JSON.parse(e.data)}catch(x){return}if(!m)return;const path=m.path.replace(/^\/|\/$/g,'').split('/').filter(Boolean);let d=m.data;
+      if(path.length===0){ // kök: tam görüntü
+        if(e.type==='put'){remote=(d&&d.notes)||{};votes=(d&&d.votes)||{};$$('[data-key]').forEach(el=>{if(!(el.dataset.key in remote)&&el!==document.activeElement&&!el.dataset.key.includes('_x'))el.value=''});$$('.note .del').forEach(b=>{const k=b.parentElement.querySelector('textarea').dataset.key;if(!(k in remote))b.parentElement.remove()});Object.keys(remote).forEach(k=>apply(k,remote[k]))}
+        else{ if(d.notes!==undefined){Object.assign(remote,d.notes||{});Object.keys(d.notes||{}).forEach(k=>apply(k,d.notes[k]))} if(d.votes!==undefined){votes=d.votes||{}} }
+        paintVotes();return}
+      if(path[0]==='notes'){
+        if(path.length===1){ if(e.type==='put'){remote=d||{};$$('[data-key]').forEach(el=>{if(!(el.dataset.key in remote)&&el!==document.activeElement)apply(el.dataset.key,null)});Object.keys(remote).forEach(k=>apply(k,remote[k]))} else {Object.assign(remote,d||{});Object.keys(d||{}).forEach(k=>{if(d[k]==null)delete remote[k];apply(k,d[k])})} }
+        else{const k=path[1];if(d==null)delete remote[k];else remote[k]=d;apply(k,d)}
+        return}
+      if(path[0]==='votes'){ if(path.length===1){votes=e.type==='put'?(d||{}):Object.assign(votes,d||{})} else {if(d==null)delete votes[path[1]];else votes[path[1]]=d} paintVotes() }
+    };
+    es.addEventListener('put',onData);es.addEventListener('patch',onData);
+    es.addEventListener('cancel',()=>live('err','erişim reddedildi'));
+    es.addEventListener('auth_revoked',()=>live('err','erişim reddedildi'));
+  }
+  listen();
 
   /* ---------- ZAMAN ÇİZGİSİ ---------- */
   const segs=[{t:'Açılış',d:10,h:'#b0',id:'t0',c:'var(--muted)'},{t:'Tur 1 · Keşfet',d:30,h:'#b1',id:'t1',c:'var(--blue)'},{t:'Tur 2 · Haritala',d:25,h:'#b2',id:'t2',c:'var(--tealdk)'},{t:'Ara',d:10,h:'#ara',id:'tara',ara:true},{t:'Tur 3 · Planla',d:30,h:'#b3',id:'t3',c:'var(--dark)'},{t:'Tur 4 · Savun',d:25,h:'#b4',id:'t4',c:'#2B46C9'},{t:'Galeri + Kapanış',d:20,h:'#b5',id:'t5',c:'var(--tealdk)'}];
@@ -1031,10 +1097,11 @@ KURAL: YZ bilgi taşır, karar vermez — son karar masada. Gerçek müşteri ve
   const scores=[0,0,0,0,0];
   sc.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const i=+b.parentElement.dataset.i;scores[i]=+b.dataset.v;b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));$('#scoreTotal').textContent=scores.reduce((a,b)=>a+b,0)});
 
-  /* ---------- OYLAMA ---------- */
-  const votes={A:0,B:0,C:0};
-  $$('.vote button').forEach(b=>b.addEventListener('click',()=>{votes[b.dataset.v]++;b.querySelector('b').textContent=votes[b.dataset.v]}));
-  $('#voteReset').addEventListener('click',()=>{for(const k in votes){votes[k]=0}$$('.vote b').forEach(b=>b.textContent='0')});
+  /* ---------- OYLAMA (cihaz başına bir oy, tüm cihazlarda ortak sayım) ---------- */
+  let dev=ls.get('cl-dev');if(!dev){dev='d'+Math.random().toString(36).slice(2,10);ls.set('cl-dev',dev)}
+  function paintVotes(){const c={A:0,B:0,C:0};Object.values(votes).forEach(v=>{if(c[v]!=null)c[v]++});$$('.vote button').forEach(b=>{b.querySelector('b').textContent=c[b.dataset.v];b.setAttribute('aria-pressed',String(votes[dev]===b.dataset.v))})}
+  $$('.vote button').forEach(b=>b.addEventListener('click',()=>{const v=b.dataset.v;if(votes[dev]===v){delete votes[dev];fetch(`${DB}/votes/${dev}.json`,{method:'DELETE'}).catch(()=>{})}else{votes[dev]=v;fetch(`${DB}/votes/${dev}.json`,{method:'PUT',body:JSON.stringify(v)}).catch(()=>{})}paintVotes()}));
+  $('#voteReset').addEventListener('click',()=>{if(!confirm('Tüm cihazlardaki oylar sıfırlanacak. Emin misiniz?'))return;votes={};fetch(`${DB}/votes.json`,{method:'DELETE'}).catch(()=>{});paintVotes()});
 
   /* ---------- REHBER GÖRÜNÜMÜ ---------- */
   $('#vText').addEventListener('click',()=>{$('#rehberText').hidden=false;$('#rehberPdf').hidden=true;$('#vText').setAttribute('aria-pressed','true');$('#vPdf').setAttribute('aria-pressed','false')});
@@ -1049,7 +1116,11 @@ KURAL: YZ bilgi taşır, karar vermez — son karar masada. Gerçek müşteri ve
   $('#facClose').addEventListener('click',()=>setFac(false));
   $('#facToggle').addEventListener('click',()=>{if(document.body.classList.contains('fac-on'))setFac(false);else{location.hash='#fac';setTimeout(()=>$('#facPass').focus(),50)}});
   try{if(sessionStorage.getItem('cl-fac')==='1')setFac(true)}catch(e){}
+  $('#facClear').addEventListener('click',()=>{if(!confirm('TÜM grupların notları ve oylar silinecek (tüm cihazlarda). Yeni oturuma geçiyor musunuz?'))return;sync.clear().then(()=>{votes={};$$('[data-key]').forEach(el=>el.value='');$$('.note .del').forEach(b=>b.parentElement.remove());paintVotes();try{Object.keys(localStorage).filter(k=>k.startsWith('cl-t')).forEach(k=>localStorage.removeItem(k))}catch(e){}toast('Pano temizlendi')}).catch(()=>toast('Temizlenemedi — bağlantıyı kontrol edin'))});
+  $('#facClearG').addEventListener('click',()=>{if(!confirm(`Grup ${cur} notları silinecek (tüm cihazlarda). Emin misiniz?`))return;sync.clear(cur).then(()=>{paint();toast(`Grup ${cur} temizlendi`)}).catch(()=>toast('Temizlenemedi — bağlantıyı kontrol edin'))});
 
   paint();drawTL();
 })();
 </script>
+</body>
+</html>
